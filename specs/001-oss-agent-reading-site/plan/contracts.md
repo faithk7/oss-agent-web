@@ -16,11 +16,10 @@ interface PaymentProvider {
   }): Promise<{ action: PaymentAction; checkoutRef?: string }>;
   verifyNotification(rawBody: Uint8Array, headers: Headers): Promise<NormalizedPaymentEvent[]>;
   queryOrder(orderId: string): Promise<NormalizedPaymentEvent>;
-  queryRefund(orderId: string): Promise<NormalizedRefundState>;
 }
 ```
 
-类型为合约草案；NormalizedPaymentEvent 至少含 provider、eventId、orderId、transactionId、商户/应用标识、amountMinor、currency、状态与发生时间。只有适配器验签或认证查单生成的事件才能进入授予事务。退款由商户后台发起，站内通知/查询确认后撤销；v1 不提供浏览器退款 API。
+类型为合约草案；NormalizedPaymentEvent 至少含 provider、eventId、orderId、transactionId、商户/应用标识、amountMinor、currency、状态与发生时间。只有适配器验签或认证查单生成的事件才能进入授予事务。v1 无退款通路；渠道争议由管理员人工撤销对应授予。
 
 金额、币种、时长由服务端价格配置固化到订单，客户端不可覆盖。支付宝金额使用十进制定点字符串与 CNY 分精确转换，禁止浮点乘除。`POST /api/checkout` 接收 provider、scene 与幂等键，不接收可信的价格或 userId；幂等键绑定当前用户及请求指纹。未支持的设备场景返回明确错误，不静默切换付款方式。
 
@@ -41,7 +40,7 @@ interface PaymentProvider {
 
 不得把微信 JSON 原始报文验签规则套到支付宝表单通知；防重放窗口遵循各通道协议，不拒绝合法延迟通知。未知事件验证后记录并确认；处理失败不得成功确认。数据库事务回滚后，重试必须仍可处理，不能因为存在失败事件就跳过。仅 `processed/ignored` 是可直接确认的幂等终态。
 
-通知与主动查单走相同 reducer 和来源唯一约束；退款先到、付款后到不能恢复已撤销权益。`GET /api/orders/{id}` 仅所有者可读本地状态，限频轮询；扫码/回跳/JSAPI 的前端成功状态不授予权益。超时创建先查单，不盲目创建新支付。全额退款撤销来源；部分退款记录并进入人工处理，不自动全额撤销。
+通知与主动查单走相同 reducer 和来源唯一约束。`GET /api/orders/{id}` 仅所有者可读本地状态，限频轮询；扫码/回跳/JSAPI 的前端成功状态不授予权益。超时创建先查单，不盲目创建新支付。通知路由不做 IP 限流——验签是门槛，必须允许服务商重试。
 
 ## 内容与文章接口
 
@@ -51,6 +50,7 @@ interface PaymentProvider {
 
 - `content:sync [--dry-run]`：完整扫描、输出差异；提交失败不改变已发布版本。
 - `tags:run`：加锁、幂等、最多重试 3 次，旧标签在失败时保留。
+- `tags:review`：接受／拒绝／恢复自动标签；接受词表外新词（置 `public`）。
 - `codes:issue`、`codes:disable`、`entitlements:revoke`：参数校验、操作员身份/权限、审计事件；明文兑换码只打印一次。
 - `ops:status`、`ops:reconcile-orders`、`ops:cleanup-media`：只读诊断、订单对账和媒体 GC。
 

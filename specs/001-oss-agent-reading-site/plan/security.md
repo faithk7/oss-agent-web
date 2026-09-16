@@ -10,11 +10,11 @@ Auth.js cookie 使用 Secure、HttpOnly、SameSite=Lax；浏览器业务 POST �
 
 ## 付费内容边界
 
-付费 HTML 不进入静态构建产物、公共缓存、客户端 props、RSC 非必要序列化对象、错误页、日志或 analytics。数据库错误、缺失会话和未知媒体均 fail closed。付费页面强制动态渲染和 `no-store`；设置 CSP、HSTS、Referrer-Policy、X-Content-Type-Options、frame-ancestors。
+付费 HTML 不进入静态构建产物、公共缓存、CDN、客户端 props、RSC 非必要序列化对象、错误页、日志或 analytics。数据库错误、缺失会话和未知媒体均 fail closed。付费页面强制动态渲染和 `no-store`；设置 CSP、HSTS、Referrer-Policy、X-Content-Type-Options、frame-ancestors。
 
 ## 管理与隐私
 
-`ADMIN_USER_IDS` 启动时严格解析且默认拒绝；破坏性 CLI 必须由受信操作员执行并写审计。定义邮箱、OAuth ID、订单、审计和限流数据的保留/删除策略；隐私政策、服务条款和退款说明上线前完成。微信登录／微信支付、支付宝、Resend、Stripe、标签模型作为处理方记录数据跨境与密钥轮换方案。
+`ADMIN_USER_IDS` 启动时严格解析且默认拒绝；破坏性 CLI 必须由受信操作员执行并写审计。定义邮箱、OAuth ID、订单、审计和限流数据的保留/删除策略；隐私政策与服务条款（声明不支持退款）上线前完成。微信登录／微信支付、支付宝、Resend、Stripe、标签模型作为处理方记录数据跨境与密钥轮换方案。用户数据境内存储；隐私政策符合《个人信息保护法》（PIPL）：个人信息最小化、境内存储、明示处理方清单。DeepSeek 为境内服务（正文不出境）；Stripe、Resend、GitHub OAuth 涉及出境，在隐私政策中明示并评估必要性。
 
 ## 安全测试
 
@@ -26,3 +26,4 @@ Auth.js cookie 使用 Secure、HttpOnly、SameSite=Lax；浏览器业务 POST �
 - OAuth state、防 code 重放、绑定账号冲突和开放重定向均有测试。登录与付款互不冒充授权，付款 openid 不改变订单所属用户。
 - 通知验签后仍核对商户、AppID、订单、金额、币种和交易状态。支付宝按其参数规范验签，微信按 API v3 验签并解密，使用成熟密码库，不自制签名算法。
 - 支付 URL/二维码不得包含站内会话密钥；订单状态端点防越权、限流和 no-store。密钥、授权 code、token、通知解密正文不进入日志。
+- 支付通知路由不做 IP 限流（必须允许服务商重试），验签是门槛；签名失败率异常时告警。
