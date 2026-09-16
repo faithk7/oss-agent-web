@@ -8,7 +8,7 @@
 
 ## 摘要
 
-建设一个围绕开源软件与编程 Agent 的精选阅读网站，覆盖 Kimi Code、Codex 等主题。站长在 git 里写 Markdown。批处理 CLI 同步并渲染这些文件，离线打标签 Agent 再从受控词表提出标签建议。读者浏览文章库、按标题搜索、按主题／标签筛选，阅读免费正文与付费试读。付费全文只在服务端完成权益校验后返回。首版只提供一种有期限的全站通行证，通过一家支付服务商购买或一次性兑换码开通，权益相同。
+建设一个围绕开源软件与编程 Agent 的精选阅读网站，覆盖 Kimi Code、Codex 等主题。站长在 git 里写 Markdown。批处理 CLI 同步并渲染这些文件，离线打标签 Agent 再从受控词表提出标签建议。读者浏览文章库、按标题搜索、按主题／标签筛选，阅读免费正文与付费试读。付费全文只在服务端完成权益校验后返回。首版只提供一种有期限的全站通行证，通过微信支付、支付宝或 Stripe 国际卡购买，也可用一次性兑换码开通，权益相同。
 
 技术方案：一个 Next.js App Router 应用、一个 PostgreSQL 数据库、一套负责同步／打标签／管理的 CLI。付费 HTML 不得打进客户端静态包。试读 HTML 与正文 HTML 在同步时分别生成，请求时按权限选择返回哪一份。
 
@@ -16,11 +16,11 @@
 
 **语言／版本**：TypeScript 5.x，Node.js 22，strict 模式。
 
-**主要依赖**：Next.js 15（App Router、React Server Components）、Auth.js v5、Drizzle ORM、Zod、带清理的 `unified`／`remark`／`rehype`、`gray-matter`、支付服务商接口后的 Stripe SDK、Resend（magic link 邮件）。
+**主要依赖**：Next.js 15（App Router、React Server Components）、Auth.js v5、Drizzle ORM、Zod、带清理的 `unified`／`remark`／`rehype`、`gray-matter`、统一支付接口后的微信支付 API v3、支付宝 SDK 与 Stripe SDK、Resend（magic link 邮件）。
 
 **存储**：PostgreSQL 16。Markdown 权威源在 `content/articles/`。生成的试读 HTML、正文 HTML、搜索字段、标签、用户、订单、权益授予、兑换码都放在 Postgres。首版不加独立搜索服务，不加 Redis。
 
-**测试**：Vitest 覆盖单元／集成（权益、同步、打标签、搜索 AND、兑换并发）。Playwright 覆盖读者路径。Stripe 沙箱／test clock 覆盖支付回调。兑换并发测试使用真实 Postgres（Testcontainers 或本地 compose）和 `pg` advisory lock。
+**测试**：Vitest 覆盖单元／集成（权益、同步、打标签、搜索 AND、兑换并发）。Playwright 覆盖读者路径。各支付适配器合约测试覆盖支付回调；Stripe／支付宝使用可用测试环境，微信支付按产品可用测试能力联调并在启用前完成受控小额实付与退款验证。兑换并发测试使用真实 Postgres（Testcontainers 或本地 compose）和 `pg` advisory lock。
 
 **目标平台**：Linux 服务器或 Vercel 一类 Node 托管。界面首版为中文。文章元数据与标题搜索同时支持 `zh` 和 `en`。
 
@@ -37,7 +37,7 @@
 - Markdown 中的原始 HTML 必须经过持续维护的清理工具；禁止 `javascript:` 链接与可执行嵌入。
 - 不禁用复制、右键或键盘快捷键。
 
-**规模／范围**：一名站长、数百篇文章、数千读者。一种通行证 SKU。六个公开页面，管理入口首版以 CLI 为主。首版不做浏览器内编辑、评论、读者投稿、语义搜索、多支付服务商、独立移动应用。
+**规模／范围**：一名站长、数百篇文章、数千读者。一种通行证 SKU。六个公开页面，管理入口首版以 CLI 为主。首版不做浏览器内编辑、评论、读者投稿、语义搜索、多商户分账、独立移动应用。
 
 ## 宪章检查
 
@@ -50,10 +50,10 @@
 | G3 服务端访问控制 | 每次受保护正文请求都重新校验权益。试读 ≠ 正文。 | 两列 HTML；RSC／数据层按授予记录分支。 |
 | G4 Agent 隔离 | 打标签离线执行，模型输入视为不可信，不得改发布／价格／正文。 | CLI 用 JSON schema 校验，写权限仅限标签相关表。 |
 | G5 权益记账 | 购买与兑换各自生成独立授予记录，只生效一次。从 `max(现在, 当前到期)` 起延长。退款／撤销按剩余有效授予重算。 | `entitlement_grants` 用来源唯一键，并重算 `access_until`。 |
-| G6 简单 | 不做浏览器编辑器、评论、行为追踪推荐、全文／语义搜索、多支付服务商。 | 见「明确不做」。 |
+| G6 简单 | 不做浏览器编辑器、评论、行为追踪推荐、全文／语义搜索、多商户分账。 | 见「明确不做」。 |
 | G7 先测钱相关路径 | 权限边界、支付幂等、兑换并发、搜索与打标签必须有自动化检查。上线前走支付沙箱。 | 见本文测试计划。 |
 
-没有需要为复杂度破例的宪章违规。复杂度跟踪表为空。
+用户最新需求明确要求微信登录、微信支付和支付宝；该授权取代原规格的单支付服务商限制。仍保持单一 SKU、单应用和同一套权益账本，不增加分账或订阅计费。
 
 ## 调研结论（Phase 0，内联）
 
@@ -63,7 +63,7 @@
 
 - **决定**：TypeScript + Next.js 15 App Router，单包。
 - **理由**：规格要求一个 Web 应用同时负责页面、账户、搜索、支付与兑换。RSC 和 Route Handlers 能把付费 HTML 留在服务端。同一仓库可以用 `tsx` 暴露 CLI，不必再起一个服务。
-- **备选**：Nuxt／Nitro（可以，但这套鉴权拆分上 Auth.js／Stripe 资料更熟）。Astro + API（适合内容站，付费会话会变成第二个应用）。Django／Rails（对 Markdown 目录来说偏重）。拆 `frontend/` + `backend/`（违反规格第 9 节）。
+- **备选**：Nuxt／Nitro（可以，但这套鉴权拆分上 Auth.js 资料更熟）。Astro + API（适合内容站，付费会话会变成第二个应用）。Django／Rails（对 Markdown 目录来说偏重）。拆 `frontend/` + `backend/`（违反规格第 9 节）。
 
 ### 决策 2 — 数据库：PostgreSQL + Drizzle
 
@@ -71,18 +71,22 @@
 - **理由**：规格要求授予记录、一次性兑换码、参数化搜索都有关系完整性。Drizzle 让标题 `ILIKE` 和标签 AND 的 SQL 看得见。标题搜索用 `LOWER(title) LIKE '%' || LOWER($q) || '%'` 并限制长度——按规格不依赖中文分词。
 - **备选**：SQLite（兑换并发弱）。Prisma（能用；更想直接控 SQL，所以选 Drizzle）。Meilisearch／OpenSearch（明确延后）。
 
-### 决策 3 — 认证：Auth.js，GitHub + magic link
+### 决策 3 — 认证：微信登录 + GitHub + magic link
 
-- **决定**：Auth.js v5。登录方式：GitHub OAuth 和邮件 magic link（Resend）。角色：`reader`、`admin`。管理员还可由 `ADMIN_USER_IDS` 引导。
-- **理由**：规格禁止自研凭据加密。看编程 Agent 的读者大多有 GitHub。没有 GitHub 的走 magic link。权益绑定 `user.id`，不只绑浏览器会话。
-- **备选**：Clerk／Auth0（多一个供应商，自托管更难）。用户名密码（规格要求不要自己做凭据加密）。
+- **决定**：Auth.js 管理本站会话，增加微信开放平台网站应用扫码登录；保留 GitHub OAuth 和 Resend magic link。微信不是企业微信，不要求用户必须有邮箱。
+- **浏览器范围**：桌面网站支持微信扫码；手机浏览器保留 GitHub／邮件登录及跨设备扫码说明，不假设手机能扫描自身屏幕。微信扫码登录只支持桌面网站二维码场景。
+- **身份**：以服务端换取的 `(appid, openid)` 唯一识别微信账号；`unionid` 可空，不凭昵称／头像／邮箱自动合并账户。登录后重新验证目标身份才能绑定，权益始终绑定内部 `user.id`。
+- **安全与接入**：一次性 state、限定回调域名、服务端 code 交换、取消／过期／重放处理。网站应用 AppID/Secret 与微信支付商户密钥分开配置。详见 [合约](plan/contracts.md)。
 
-### 决策 4 — 支付：服务商接口，Stripe 作为第一个适配器
+### 决策 4 — 支付：微信支付 + 支付宝 + Stripe
 
-- **决定**：内部 `PaymentProvider` 端口。第一个适配器是 Stripe Checkout + 验签 webhook。金额、币种、时长来自环境变量（`PASS_AMOUNT`、`PASS_CURRENCY`、`PASS_DURATION_DAYS`）。国内收银台（微信／支付宝）是第二个适配器，不改表结构。
-- **理由**：规格要求上线时选一家支付服务商，并以验证过的服务端事件为付款依据。Stripe 沙箱最快能测幂等、金额／币种校验和退款。授予表除 `provider` + `provider_ref` 外不存 Stripe 专有字段。
-- **脆弱假设**：首发市场能用 Stripe；或者先只发兑换码，等国内支付适配器。若第一批付费用户用不了 Stripe，配置里关掉 Checkout，兑换码作为唯一授予来源。
-- **备选**：Lemon Squeezy（webhook 控制弱一些）。先直接接微信支付（更贴国内，但沙箱里把规格要求的测试跑完更慢）。
+- **v1 必须支持**：微信支付和支付宝；保留 Stripe 国际卡适配器。一个有期限通行证 SKU，各通道授予完全相同的权限与时长。
+- **微信支付**：桌面采用 Native 二维码；手机外部浏览器采用已开通的 H5 支付，微信内采用已开通的 JSAPI 支付。JSAPI 的 payer openid 必须来自支付所用 AppID 的授权，不能复用网站登录 AppID 的 openid。
+- **支付宝**：桌面使用电脑网站支付，手机外部浏览器使用手机网站支付；微信内遇到限制时提示在外部浏览器打开。服务端生成支付请求，不使用个人收款码或截图确认。
+- **国际卡**：Stripe 保留为独立通道，其商户准入／打款资格需上线前确认；不再是微信支付、支付宝交付的前提。
+- **价格与订单**：微信支付／支付宝以 CNY 分计价，Stripe 使用单独服务端定价；不做浏览器换汇。创建订单时固化通道、金额、币种、时长。每个订单只绑定一个通道，重试幂等，切换通道建立明确的新订单。
+- **回调与对账**：各适配器独立验签、解析和回执，统一到订单、支付事件与权益事务；查询付款状态和退款对账也通过同一适配器。回跳、扫码和客户端 SDK 返回均不作为授予证据。
+- **上线门禁**：网站微信登录应用审核，以及微信支付／支付宝商户、产品权限、回调域名和密钥配置分别检查。某通道未开通时明确显示不可用，其他通道和兑换码继续服务；不将降级视为该通道验收完成。
 
 ### 决策 5 — 同步时生成试读
 
@@ -127,7 +131,7 @@
    读者浏览器 --> Next.js RSC／Route Handlers
                           |           \
                      GET 文章          POST 兑换
-                     GET 搜索          POST Stripe webhook
+                     GET 搜索          POST 支付通知
                      GET 文章库        POST Checkout 会话
                           |
                      权益重算：
@@ -135,12 +139,12 @@
                      未撤销、来源唯一
 ```
 
-没有环。模型 HTTP 只从打标签 CLI 出站。Stripe 入站只有验签 webhook，出站只有创建 Checkout 会话。
+没有环。模型 HTTP 只从打标签 CLI 出站。支付适配器入站为验签通知，出站包括创建支付、查单和退款对账。
 
 降级：
 - 打标签或模型挂了：文章仍可发布；上次成功标签保留；本次运行记 `failed`，可重跑。
-- Stripe 挂了：兑换码仍能开通权限；收银台给出明确错误，前端不得自己宣布「支付成功」。
-- 邮件／Resend 挂了：GitHub 登录仍可用。
+- 单一支付通道故障或未开通：其他已启用通道与兑换码仍能开通权限；收银台给出明确错误，前端不得自己宣布「支付成功」。
+- 邮件／Resend 挂了：微信／GitHub 登录仍可用；微信登录故障不影响其他登录方式。
 
 回滚：应用无状态。迁移只向前、只加列。授予记录只追加（撤销用标记），错误发布不必回滚支付。
 
@@ -155,7 +159,15 @@ specs/001-oss-agent-reading-site/
 └── tasks.md                                     # 之后由 speckit.tasks／实现阶段生成
 ```
 
-`research.md`、`data-model.md`、`contracts/`、`quickstart.md` 都内联在本文件，避免一堆空占位文件。
+调研结论仍内联在本文件；可执行的模型、合约、安全、运维和验收细节拆到下列专题文件，避免主计划过长且方便分别评审。
+
+为便于实现和评审，以下专题计划从本文件拆出：
+
+- [数据模型与一致性](plan/data-model.md)
+- [接口与 CLI 合约](plan/contracts.md)
+- [安全、隐私与访问控制](plan/security.md)
+- [运维、部署与恢复](plan/operations.md)
+- [验收标准与测试矩阵](plan/acceptance.md)
 
 ### 源码（仓库根）
 
@@ -185,6 +197,8 @@ src/
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts
 │       ├── checkout/route.ts
+│       ├── webhooks/wechatpay/route.ts
+│       ├── webhooks/alipay/route.ts
 │       ├── webhooks/stripe/route.ts
 │       └── redeem/route.ts
 ├── components/                       # 文章卡片、筛选、试读区、通行证 CTA
@@ -195,7 +209,7 @@ src/
 │   ├── recommend/
 │   ├── auth/
 │   ├── entitlements/                 # 授予生效、重算 access_until
-│   ├── payments/                     # PaymentProvider 端口 + Stripe 适配器
+│   ├── payments/                     # PaymentProvider + 微信支付／支付宝／Stripe 适配器
 │   ├── redeem/
 │   ├── tagging/                      # 提示词、schema、人工／自动／拒绝合并
 │   └── rate-limit/                   # IP + 用户键，存在 Postgres
@@ -354,9 +368,9 @@ flowchart LR
 
 - `id` uuid pk
 - `user_id` uuid not null
-- `provider` text not null  —— `stripe`
-- `provider_ref` text unique  —— checkout／session 或 payment intent
-- `amount` numeric not null
+- `provider` text not null  —— `wechatpay`、`alipay`、`stripe`
+- `provider_ref` text null —— 通道交易 id；unique(provider, provider_ref)，另存 checkout_ref，不混用两种 id
+- `amount_minor` bigint not null —— 货币最小单位，必须为正
 - `currency` text not null
 - `duration_days` int not null
 - `status` text not null check（`pending`、`paid`、`failed`、`canceled`、`refunded`）
@@ -431,8 +445,9 @@ flowchart LR
 
 ### JSON／POST
 
-- `POST /api/checkout` 必须登录 → 创建 `orders` 行 + 服务商会话。返回会话 URL。
-- `POST /api/webhooks/stripe` 验签；未知事件忽略；核对金额／币种／状态；按 `provider_event_id` 幂等（写入审计／订单）。成功页查询参数不可信。
+- `POST /api/checkout` 必须登录 → 校验 provider 与设备场景，创建幂等订单及支付请求。返回 redirect／qr／jsapi 判别联合，不再只返回 URL。
+- `POST /api/webhooks/{wechatpay|alipay|stripe}`：各通道独立路由及官方协议验签／回执，核对商户、应用、订单、金额、币种和状态；`payment_events(provider,event_id)` 幂等。只认验证过的服务端事件或主动查单结果，不认浏览器回跳。
+- `GET /api/orders/{id}`：仅订单所有者可读，返回本地支付状态；前端限频轮询，不直接暴露支付凭据。
 - `POST /api/redeem` 必须登录，限流。Body `{ "code": "..." }`。响应：已授予、你已兑换过、无效（无效／过期／停用／已被他人使用用同一句文案，不泄露兑换者）。
 - 搜索与文章 GET 走 HTML／RSC，不提供未认证的批量 JSON 导出。
 
@@ -487,7 +502,7 @@ flowchart LR
 2. 中英文标题子串搜索都可用；URL 往返能还原筛选。
 3. 精选与相关阅读顺序符合规格。
 4. 已登录用户兑换新码后写入 `access_until`；付费正文能渲染。
-5. 金额正确且验签通过的 Stripe `payment_intent.succeeded` 只授予一次。
+5. 金额正确且验签通过的 各通道订单成功事件只授予一次。
 
 错误／边界：
 - front matter 无效：CLI 给出可操作错误；最近一次有效已发布行保留。
@@ -495,7 +510,7 @@ flowchart LR
 - 草稿／已归档对有权益用户也 404。
 - 匿名请求的 HTML、RSC 载荷、`/_next/static`、`/media/public/*` 中都没有付费正文或付费图。`/media/paid/*` 无授予时 404。
 - 超出上限的试读在同步时按小节边界截断，不在请求时截。
-- 伪造／未签名／金额不符／重放的 Stripe 事件不能额外授予。
+- 伪造／未签名／金额不符／重放的支付事件不能额外授予。
 - 只打开 `/pricing/success`、没有 webhook，不能授予。
 - 同一兑换码并发兑换：一个成功、一个干净失败，时长不翻倍。
 - 同一用户重试同一码：不再次延长。
@@ -519,11 +534,11 @@ Compose 起 Postgres，Drizzle 建文章／词表／重定向表，Markdown 校�
 
 ### 阶段 3 — 访问控制
 
-Auth.js、账户、试读区 + CTA、权益授予、一次性兑换码、限流、缓存头（正文 `Cache-Control: private, no-store`）。管理员 CLI 负责发码和撤销。
+Auth.js、微信扫码登录与账号绑定（保留 GitHub／邮件）、账户、试读区 + CTA、权益授予、一次性兑换码、限流、缓存头（正文 `Cache-Control: private, no-store`）。管理员 CLI 负责发码和撤销。
 
 ### 阶段 4 — 支付与上线
 
-Stripe 适配器、收银台、webhook、未完成 `pending` 订单对账、退款 → 撤销、沙箱验证、`PUBLIC_INDEXING` 开关、生产环境。
+微信支付、支付宝和 Stripe Checkout 适配器；按浏览器场景展示可用方式；二维码／跳转／JSAPI、订单状态查询、幂等通知、pending 对账与退款撤销。各通道独立完成商户／产品准入和测试门禁后启用。微信登录与两种国内支付是 v1 验收项；测试环境不可用时不得以 mock 代替真实联调。
 
 ## 实现前需要的密钥与账号
 
@@ -533,39 +548,42 @@ Stripe 适配器、收银台、webhook、未完成 `pending` 订单对账、退�
 | `AUTH_SECRET` | Auth.js 会话 |
 | `AUTH_GITHUB_ID`／`AUTH_GITHUB_SECRET` | GitHub 登录 |
 | `RESEND_API_KEY`／`EMAIL_FROM` | magic link |
-| `STRIPE_SECRET_KEY`／`STRIPE_WEBHOOK_SECRET`／`STRIPE_PRICE_ID` | 收银台与 webhook（阶段 4；此前用空适配器） |
-| `PASS_AMOUNT`／`PASS_CURRENCY`／`PASS_DURATION_DAYS` | 单一 SKU |
+| `STRIPE_SECRET_KEY`／`STRIPE_WEBHOOK_SECRET`／`STRIPE_PRICE_ID`／`STRIPE_MODE`（`test`｜`live`） | Stripe Checkout 与 webhook（阶段 4；此前用空适配器） |
+| `PASS_CNY_AMOUNT_MINOR`／`STRIPE_PASS_AMOUNT_MINOR`／`STRIPE_PASS_CURRENCY`／`PASS_DURATION_DAYS` | 单一 SKU，分通道服务端价格 |
+| `WECHAT_LOGIN_APP_ID`／`WECHAT_LOGIN_APP_SECRET` | 网站扫码登录 |
+| `WECHAT_PAY_APP_ID`／`WECHAT_PAY_MCH_ID`／`WECHAT_PAY_API_V3_KEY`／`WECHAT_PAY_PRIVATE_KEY_PATH`／`WECHAT_PAY_SERIAL_NO`／`WECHAT_PAY_PUBLIC_KEY_ID`／`WECHAT_PAY_PUBLIC_KEY_PATH` | 微信支付签名、验签及通知解密；平台证书模式由适配器另行配置 |
+| `ALIPAY_APP_ID`／`ALIPAY_PRIVATE_KEY_PATH`／`ALIPAY_PUBLIC_KEY_PATH`／`ALIPAY_GATEWAY` | 支付宝 RSA2 模式；如选择证书模式，单独配置证书链 |
+| `APP_BASE_URL`／`PAYMENT_PROVIDERS_ENABLED`／`WECHAT_LOGIN_ENABLED` | 固定回调地址来源、支付与登录独立开关 |
 | `TAGGER_BASE_URL`／`TAGGER_API_KEY`／`TAGGER_MODEL` | 离线打标签（阶段 2） |
 | `ADMIN_USER_IDS` | 引导管理员 |
 
-首版不再引入其他供应商。
+首版支付供应商限定微信支付、支付宝、Stripe；不增加其他通道或分账。
 
 ## 明确不做
 
-浏览器内 Markdown 编辑、读者投稿、评论、社交信息流、基于行为的个性化、全文或语义搜索、向量库、任务队列、多支付服务商、独立移动应用、单篇购买、自动续费订阅、全站共享密码、面向读者的 API Key、存储银行卡、禁用复制／右键。
+浏览器内 Markdown 编辑、读者投稿、评论、社交信息流、基于行为的个性化、全文或语义搜索、向量库、任务队列、多商户分账、独立移动应用、单篇购买、自动续费订阅、全站共享密码、面向读者的 API Key、存储银行卡、禁用复制／右键。
 
 ## 关键决策
 
 1. **一个 Next.js 应用 + Postgres + CLI** —— 对齐规格第 9 节，付费 HTML 留在服务端。
 2. **试读与正文是同步时的两份产物** —— 这是满足 4.3、又不信任客户端的唯一做法。
 3. **授予只追加、来源唯一** —— 购买、兑换、退款、叠加共用一次重算。
-4. **Stripe 是第一个支付适配器，不是领域模型** —— 国内支付可以替换 Checkout，不必重写权益。
+4. **微信支付、支付宝、Stripe 共用领域模型** —— 国内钱包纳入 v1，国际卡保留；每个通道独立准入、验签与对账，统一授予权益。
 5. **打标签不能挡住发布** —— 人工标签和标题搜索立刻可用；模型只是批处理补充。
 
 ## 前提崩塌
 
-本计划默认 v1 可以走 Next.js + Postgres + Stripe 沙箱；即便后来因市场关掉 Stripe，兑换码仍然能发。
+本计划以 Next.js + Postgres 为基础，微信登录、微信支付与支付宝为 v1 必需能力，Stripe 保留国际卡。各平台账号审核与产品开通在开发初期开始，不能等到阶段 4 才发现不具备接入条件。
 
-若站长否决 Next.js，数据模型、试读拆分、权益重算和四阶段交付保留，只改目录树和认证库。
-
-若第一批付费市场用不了 Stripe，先交付阶段 1–3（只靠兑换码），阶段 4 再加微信／支付宝适配器，不必改 `entitlement_grants`。
+未开通的通道保持关闭，其他通道可独立运行；兑换码可作为临时降级，但不能替代未完成的微信／支付宝需求。若商户申请受阻，记录外部依赖，不自行替换成个人收款码或删除需求。
 
 ## 明确推迟的未知项
 
 | 事项 | 为何推迟 | 负责人 |
 | --- | --- | --- |
 | 通行证准确价格与退款文案 | 运营事项，不是表结构。读环境变量。 | 阶段 4 前由站长定 |
-| 若不用 Stripe，生产支付服务商 | 适配器槽位已留。 | 阶段 4 前由站长定 |
+| 微信网站应用与微信支付、支付宝产品开通 | 分别登记主体、域名、产品权限和审核状态，不能假设登录审核等于支付开通。 | 阶段 1 开始，阶段 3／4 前完成 |
+| Stripe 商户准入与打款资格 | 独立于国内支付，按当前平台规则确认。 | 阶段 4 前确认 |
 | 是否打开 `PUBLIC_INDEXING` | 规格第 12 节上线决策。默认关。 | 上线时由站长定 |
 | 托管商（Vercel 还是 VPS） | 都是一个 Node 进程 + 外部 Postgres。 | 阶段 4 由站长定 |
 
@@ -573,8 +591,8 @@ Stripe 适配器、收银台、webhook、未完成 `pending` 订单对账、退�
 
 ## 复杂度跟踪
 
-> 无宪章违规。
+> 用户明确扩展首版支付范围，原单通道限制不再适用。
 
 | 违规 | 为何需要 | 更简单方案被否的原因 |
 | --- | --- | --- |
-| — | — | — |
+| 原单支付服务商限制 | 用户要求微信支付与支付宝，同时保留国际卡 | 单通道不能覆盖已确认需求；统一适配器与权益账本限制复杂度 |
